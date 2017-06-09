@@ -34,13 +34,14 @@ public class Scanner implements Runnable {
 		scanning.set(false);
 	}
 
-	private void process() throws IOException {
+	private void process() throws IOException, InterruptedException {
 		byte[] searchPacket = DISCOVERY_MSG.getBytes();
-		@SuppressWarnings("resource")
 		MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
 		socket.setSoTimeout(SOCKET_TIMEOUT);
 		DatagramPacket packet;
 		while (!Thread.currentThread().isInterrupted()) {
+			// TODO: sleep
+			Thread.sleep(1000);
 			byte[] buf = new byte[2048];
 			packet = new DatagramPacket(buf, buf.length);
 			try {
@@ -49,6 +50,8 @@ public class Scanner implements Runnable {
 						InetAddress.getByName(MULTICAST_ADDR),
 						MULTICAST_PORT));
 				while (true) {
+					// TODO: sleep
+					Thread.sleep(1000);
 					socket.receive(packet);
 					String lightData = new String(packet.getData());
 					if (lightData.contains("HTTP/1.1 200 OK")) {
@@ -64,6 +67,8 @@ public class Scanner implements Runnable {
 					}
 				}
 			} catch (SocketTimeoutException e) {
+			} finally {
+				socket.close();
 			}
 		}
 	}

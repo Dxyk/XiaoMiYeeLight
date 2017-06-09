@@ -31,11 +31,32 @@ public class Main {
 				+ "";
 	}
 	
+	private static Device getDevice(ArrayList<Device> dl, String[] parsedInput) {
+		if (parsedInput.length < 2) {
+			System.out.println("Format error. Hit h for help");
+			return null;
+		}
+		int index;
+		try {
+			index = Integer.valueOf(parsedInput[1]);
+			if (index > dl.size() || index < 0) {
+				System.out.println("Invalid index");
+				return null;
+			} else {
+				return dl.get(Integer.valueOf(parsedInput[1]));
+			}
+		} catch (NumberFormatException e) {
+			System.out.println("Index must be an integer.");
+			return null;
+		}
+	}
+	
 	public static void main(String[] args) {
 		DeviceScanner ds = new DeviceScanner();
 		CommandSender cs = new CommandSender();
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		String input = "";
+		Device d;
 		
 		System.out.println(getClientMessage());
 		System.out.print(">>> ");
@@ -54,7 +75,7 @@ public class Main {
 				e.printStackTrace();
 			}
 			
-			String[] parsedInput = input.split(" ");
+			String[] parsedInput = input.split(" ");			
 			String cmd = parsedInput[0];
 			if (cmd.equalsIgnoreCase("q") || cmd.equalsIgnoreCase("quit")) {
 				System.out.println("Thanks for using! Quitting ...");
@@ -73,19 +94,29 @@ public class Main {
 				System.out.println(ds.listDevices());
 			} else if (cmd.equalsIgnoreCase("t") || cmd.equalsIgnoreCase("toggle")) {
 				// toggle
-				System.out.println(cs.sendToggleCommand(ds.getListDevice(), parsedInput));
+				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
+					System.out.println(cs.sendToggleCommand(d, parsedInput));
+				}
 			} else if (cmd.equalsIgnoreCase("b") || cmd.equalsIgnoreCase("bright")) {
 				// bright
-				System.out.println(cs.sendBrightCommand(ds.getListDevice(), parsedInput));
+				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
+					System.out.println(cs.sendBrightCommand(d, parsedInput));
+				}
 			} else if (cmd.equalsIgnoreCase("ct") || cmd.equalsIgnoreCase("color temperature")) {
 				// change color temperature
-				System.out.println(cs.sendColorTemperatureCommand(ds.getListDevice(), parsedInput));
+				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
+					System.out.println(cs.sendColorTemperatureCommand(d, parsedInput));
+				}
 			} else if (cmd.equalsIgnoreCase("rgb")) {
 				// change color
-				System.out.println(cs.sendRGBCommand(ds.getListDevice(), parsedInput));
+				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
+					System.out.println(cs.sendRGBCommand(d, parsedInput));
+				}
 			} else if (cmd.equalsIgnoreCase("hsv")) {
 				// change hsv
-				System.out.println(cs.sendHSVCommand(ds.getListDevice(), parsedInput));
+				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
+					System.out.println(cs.sendHSVCommand(d, parsedInput));
+				}
 			} else if (cmd.equalsIgnoreCase("")) {
 				
 			} else {

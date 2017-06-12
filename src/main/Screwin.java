@@ -39,10 +39,12 @@ public static int cmdId = 0;
 			e1.printStackTrace();
 		}
 		
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e2) {
-			e2.printStackTrace();
+		while (ds.getListDevice().size() == 0) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		Device d = ds.getListDevice().get(0);
@@ -56,36 +58,52 @@ public static int cmdId = 0;
 //		}
 		
 		int count = 0;
-		int red = 255;
-		int green = 0;
-		int blue = 0;
-		ArrayList<String> param = new ArrayList<String>();
-		while (count < 20000000) {
+//		int red = 255;
+//		int green = 0;
+//		int blue = 0;
+//		ArrayList<String> param = new ArrayList<String>();
+//		while (count < 20000000) {
+//			try {
+//				Thread.sleep(200);
+//			} catch (InterruptedException e1) {
+//				e1.printStackTrace();
+//			}
+//			param.clear();
+//			
+//			if (red != 0) {
+//				red -= 20;
+//				green += 20;
+//			} else {
+//				
+//			}
+//			
+//			param.add(String.valueOf(red * 256 * 256 + green * 256 + blue));
+//			param.add("sudden");
+//			param.add("0");
+//			try {
+//				cs.sendCommand(d, "set_rgb", param);
+//			} catch (NumberFormatException e) {
+//				e.printStackTrace();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//			count += 20;
+//		}
+		
+		ArrayList<String> param = new ArrayList<>();
+		while (count < 50) {
 			try {
-				Thread.sleep(200);
-			} catch (InterruptedException e1) {
-				e1.printStackTrace();
-			}
-			param.clear();
-			
-			if (red != 0) {
-				red -= 20;
-				green += 20;
-			} else {
-				
-			}
-			
-			param.add(String.valueOf(red * 256 * 256 + green * 256 + blue));
-			param.add("sudden");
-			param.add("0");
-			try {
-				cs.sendCommand(d, "set_rgb", param);
+				Thread.sleep(1000);
+				cs.sendCommand(d, "toggle", param);
 			} catch (NumberFormatException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
 				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
-			count += 20;
+			
+			count ++;
 		}
 		
 		try {

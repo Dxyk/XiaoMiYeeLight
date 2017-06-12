@@ -1,4 +1,4 @@
-package Things.XiaoMiYeeLight;
+package controller;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;

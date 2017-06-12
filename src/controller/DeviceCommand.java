@@ -1,4 +1,4 @@
-package Things.XiaoMiYeeLight;
+package controller;
 
 public enum DeviceCommand {
     SET_DEFAULT("set_default"),

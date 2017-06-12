@@ -1,4 +1,4 @@
-package Things.XiaoMiYeeLight;
+package controller;
 
 public enum DeviceColorMode {
     COLOR(1),

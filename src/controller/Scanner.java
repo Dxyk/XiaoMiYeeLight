@@ -1,4 +1,4 @@
-package Things.XiaoMiYeeLight;
+package controller;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -40,8 +40,8 @@ public class Scanner implements Runnable {
 		socket.setSoTimeout(SOCKET_TIMEOUT);
 		DatagramPacket packet;
 		while (!Thread.currentThread().isInterrupted()) {
-			// TODO: sleep
-			Thread.sleep(1000);
+			// sleep
+			Thread.sleep(5000);
 			byte[] buf = new byte[2048];
 			packet = new DatagramPacket(buf, buf.length);
 			try {
@@ -50,8 +50,8 @@ public class Scanner implements Runnable {
 						InetAddress.getByName(MULTICAST_ADDR),
 						MULTICAST_PORT));
 				while (true) {
-					// TODO: sleep
-					Thread.sleep(1000);
+					// sleep
+					Thread.sleep(200);
 					socket.receive(packet);
 					String lightData = new String(packet.getData());
 					if (lightData.contains("HTTP/1.1 200 OK")) {
@@ -67,10 +67,9 @@ public class Scanner implements Runnable {
 					}
 				}
 			} catch (SocketTimeoutException e) {
-			} finally {
-				socket.close();
 			}
 		}
+		socket.close();
 	}
 
 	public HashMap<String, Device> getFoundDevices() {

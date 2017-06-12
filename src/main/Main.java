@@ -10,9 +10,9 @@ import controller.Device;
 import controller.DeviceScanner;
 
 public class Main {
-	
+
 	public static int cmdId = 0;
-	
+
 	public static String getClientMessage() {
 		return "Usage:"
 				+ "\n\t q|quit: quit bulb manager"

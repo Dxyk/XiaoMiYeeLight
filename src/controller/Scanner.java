@@ -25,11 +25,11 @@ public class Scanner implements Runnable {
 	@Override
 	public void run() {
 		scanning.set(true);
-
 		try {
 			process();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			e.printStackTrace();
+		} catch (InterruptedException e) {
 		}
 		scanning.set(false);
 	}
@@ -41,7 +41,7 @@ public class Scanner implements Runnable {
 		DatagramPacket packet;
 		while (!Thread.currentThread().isInterrupted()) {
 			// sleep
-			Thread.sleep(5000);
+			Thread.sleep(1000);
 			byte[] buf = new byte[2048];
 			packet = new DatagramPacket(buf, buf.length);
 			try {

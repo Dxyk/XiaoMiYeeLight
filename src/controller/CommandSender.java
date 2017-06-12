@@ -13,8 +13,6 @@ import java.util.ArrayList;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-//import org.codehaus.jettison.json.JSONException;
-//import org.codehaus.jettison.json.JSONObject;
 
 /**
  * @author Xiangyu Kong
@@ -53,6 +51,7 @@ public class CommandSender {
 
 		return message;
 	}
+
 
 	/**
 	 * Send a command to the selected device
@@ -97,29 +96,77 @@ public class CommandSender {
 
 			JsonParser jp = new JsonParser();
 			JsonObject jsonObj = jp.parse(lightData).getAsJsonObject();
-			
+
 			if (jsonObj.has("result")) {
 				return jsonObj.get("result").getAsJsonArray().get(0).getAsString();
 			} else {
 				return jsonObj.get("error").getAsJsonObject().get("message").getAsString();
 			}
-			
-//			JSONObject jsonObj = new JSONObject(lightData);
-//			if (jsonObj.has("result")) {
-//				return jsonObj.getJSONArray("result").getString(0);
-//			} else {
-//				return jsonObj.getJSONObject("error").getString("message");
-//			}
+
 		} catch (SocketTimeoutException e) {
 			return null;
 		} catch (NoRouteToHostException e) {
 			return null;
 		}
-//		} catch (JSONException e) {
-//			e.printStackTrace();
-//			return null;
-//		}
 	}
+
+	/**
+	 * Get the property of a device d.
+	 * 
+	 * @param d			
+	 * 				The device
+	 * @param property
+	 * 				The property
+	 * @return
+	 */
+	public String getProperty(Device d, String property) {
+		ArrayList<String> prop = new ArrayList<String>();
+		prop.add(property);
+		try {
+			return sendCommand(d, "get_prop", prop);
+		} catch (NumberFormatException e) {
+			e.printStackTrace();
+			return null;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	
+	public String flash(Device d, int times) {
+		ArrayList<String> param = new ArrayList<String>();
+		String result = "";
+		if (getProperty(d, "power").equals("on")) {
+			try {
+				sendCommand(d, "toggle", param);
+			} catch (NumberFormatException e) {
+				e.printStackTrace();
+				return null;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return null;
+			}
+		}
+		for (int i = 0; i < times; i ++) {
+			try {
+				Thread.sleep(1000);
+				result = sendCommand(d, "toggle", param);
+				Thread.sleep(500);
+				result = sendCommand(d, "toggle", param);
+			} catch (NumberFormatException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+			}
+			if (!result.equals("OK")) {
+				System.out.println(result);
+			}
+		}
+		return result;
+	}
+
 
 	/**
 	 * @param d

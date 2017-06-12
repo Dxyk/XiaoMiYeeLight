@@ -1,4 +1,4 @@
-package controller;
+package Things.XiaoMiYeeLight;
 
 public enum DeviceAttribute {
 

@@ -8,18 +8,25 @@ import java.net.InetAddress;
 import java.net.NoRouteToHostException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-
 /**
+ * A command sender that sends commands to the deZ
+ * 
  * @author Xiangyu Kong
  */
 public class CommandSender {
 
 	private final int SOCKET_TIMEOUT = 2000;
+
+	private ExecutorService executor;
 
 	private static int cmdId = 0;
 
@@ -35,7 +42,8 @@ public class CommandSender {
 	private String getMsg(String method, ArrayList<String> params) {
 		cmdId++;
 
-		String message = "{\"id\":" + cmdId + ",\"method\":\"" + method + "\",\"params\":[";
+		String message = "{\"id\":" + cmdId + ",\"method\":\"" + method
+				+ "\",\"params\":[";
 		for (int i = 0; i < params.size(); i++) {
 			try {
 				Integer.valueOf(params.get(i));
@@ -52,9 +60,105 @@ public class CommandSender {
 		return message;
 	}
 
+	/**
+	 * Helper function that sends a command to the device
+	 * 
+	 * 
+	 * A list of methods and their parameters:
+	 * 
+	 * get_prop []
+	 * get the properties of the light
+	 * 
+	 * set_ct_abx [ct_value, effect, duration]
+	 * set the color temperature of the light
+	 * ct_value: 1700 ~ 6500
+	 * 
+	 * set_rgb [rgb_value, effect, duration]
+	 * set the color of the light. Format: RGB
+	 * rgb_value: 0 ~ 16777215 (0xFFFFFF)
+	 * 
+	 * set_hsv [hue_value, saturation_value, effect, duration]
+	 * set the hue and saturation value of the light
+	 * hue_value: 0 ~ 359
+	 * saturation: 0 ~ 100
+	 * 
+	 * set_bright [brightness, effect, duration]
+	 * set the brightness of the light
+	 * brightness: 0 ~ 100
+	 * 
+	 * toggle []
+	 * toggle the light for on and off
+	 * 
+	 * set_power [on/off, effect, duration]
+	 * turn on or off
+	 * 
+	 * Note:
+	 * effect: "sudden" or "smooth"
+	 * duration: 50 ~
+	 * 
+	 * @param d
+	 *            The device
+	 * @param method
+	 *            The method
+	 * @param params
+	 *            The list of parameters
+	 * @return the result of the command. return null if exception
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
+	private String sendNonInterruptCommand(Device d, String method,
+			ArrayList<String> params) throws UnknownHostException, IOException {
+		String message = getMsg(method, params);
+		String result = method + ": ";
+
+		try {
+			Socket socket = new Socket(InetAddress.getByName(d.getDeviceIp()),
+					d.getServicePort());
+			socket.setKeepAlive(true);
+			socket.setReuseAddress(true);
+			socket.setSoTimeout(SOCKET_TIMEOUT);
+
+//			System.out.println(
+//					"Connecting to " + socket.getInetAddress() + ":" + socket.getPort());
+//			System.out.println("Device ID: " + d.getDeviceId() + ", method: " + method);
+//			System.out.print(message);
+
+			// write from socket to send command
+			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+			out.write(message.getBytes());
+			out.flush();
+
+			// recieve from light for response
+			BufferedReader in = new BufferedReader(
+					new InputStreamReader(socket.getInputStream()));
+			String lightData = "";
+			lightData = in.readLine();
+
+			socket.close();
+
+			JsonParser jp = new JsonParser();
+			JsonObject jsonObj = jp.parse(lightData).getAsJsonObject();
+
+			if (jsonObj.has("result")) {
+				result += jsonObj.get("result").getAsJsonArray().get(0).getAsString();
+//				System.out.println(result);
+				return result;
+			} else {
+				result += jsonObj.get("error").getAsJsonObject().get("message")
+						.getAsString();
+//				System.out.println(result);
+				return result;
+			}
+
+		} catch (SocketTimeoutException e) {
+			return null;
+		} catch (NoRouteToHostException e) {
+			return null;
+		}
+	}
 
 	/**
-	 * Send a command to the selected device
+	 * Send a command to the selected device and interrupt the flashing thread
 	 * 
 	 * @param d
 	 *            The selected device
@@ -69,55 +173,21 @@ public class CommandSender {
 	 */
 	public String sendCommand(Device d, String method, ArrayList<String> params)
 			throws IOException, NumberFormatException {
-		String message = getMsg(method, params);
-
-		// System.out.println(message);
-
 		try {
-			Socket socket = new Socket(InetAddress.getByName(d.getDeviceIp()), d.getServicePort());
-			socket.setKeepAlive(true);
-			socket.setReuseAddress(true);
-			socket.setSoTimeout(SOCKET_TIMEOUT);
-
-			System.out.println("Connecting to " + socket.getInetAddress() + ":" + socket.getPort());
-			System.out.println("Device ID: " + d.getDeviceId() + ", method: " + method);
-
-			// write from socket to send command
-			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-			out.write(message.getBytes());
-			out.flush();
-
-			// recieve from light for response
-			BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			String lightData = "";
-			lightData = in.readLine();
-
-			socket.close();
-
-			JsonParser jp = new JsonParser();
-			JsonObject jsonObj = jp.parse(lightData).getAsJsonObject();
-
-			if (jsonObj.has("result")) {
-				return jsonObj.get("result").getAsJsonArray().get(0).getAsString();
-			} else {
-				return jsonObj.get("error").getAsJsonObject().get("message").getAsString();
-			}
-
-		} catch (SocketTimeoutException e) {
-			return null;
-		} catch (NoRouteToHostException e) {
-			return null;
+			stopFlash();
+		} catch (InterruptedException e1) {
 		}
+		return sendNonInterruptCommand(d, method, params);
 	}
 
 	/**
 	 * Get the property of a device d.
 	 * 
-	 * @param d			
-	 * 				The device
+	 * @param d
+	 *            The device
 	 * @param property
-	 * 				The property
-	 * @return
+	 *            The property
+	 * @return The property of the device
 	 */
 	public String getProperty(Device d, String property) {
 		ArrayList<String> prop = new ArrayList<String>();
@@ -132,178 +202,84 @@ public class CommandSender {
 			return null;
 		}
 	}
-	
-	
-	public String flash(Device d, int times) {
-		ArrayList<String> param = new ArrayList<String>();
-		String result = "";
-		if (getProperty(d, "power").equals("on")) {
+
+	/**
+	 * Create another thread and starts flashing for times times.
+	 * 
+	 * @param d
+	 *            The device
+	 * @param times
+	 *            Times to flash flash infinitely if set to -1
+	 */
+	public void flash(Device d, int times) {
+		executor = Executors.newSingleThreadExecutor();
+		Flash f = new Flash(d, times);
+		executor.execute(f);
+		executor.shutdown();
+	}
+
+	/**
+	 * Stop flashing and kill the thread
+	 * 
+	 * @throws InterruptedException
+	 */
+	public void stopFlash() throws InterruptedException {
+		if (executor != null) {
 			try {
-				sendCommand(d, "toggle", param);
-			} catch (NumberFormatException e) {
-				e.printStackTrace();
-				return null;
-			} catch (IOException e) {
-				e.printStackTrace();
-				return null;
+				executor.awaitTermination(2000, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
 			}
-		}
-		for (int i = 0; i < times; i ++) {
-			try {
+			executor.shutdownNow();
+			while (!executor.isTerminated()) {
 				Thread.sleep(1000);
-				result = sendCommand(d, "toggle", param);
-				Thread.sleep(500);
-				result = sendCommand(d, "toggle", param);
-			} catch (NumberFormatException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (InterruptedException e) {
+				executor.shutdownNow();
 			}
-			if (!result.equals("OK")) {
-				System.out.println(result);
-			}
-		}
-		return result;
-	}
-
-
-	/**
-	 * @param d
-	 *            The selected device
-	 * @param parsedInput
-	 *            The parsed input with the first one as the method; Second one
-	 *            as the method; Following are the parameters
-	 * @return The sendCommand result
-	 */
-	public String sendToggleCommand(Device d, String[] parsedInput) {
-		try {
-			if (parsedInput.length != 2) {
-				System.out.println("format: t <idx>");
-				return null;
-			}
-			ArrayList<String> params = new ArrayList<>();
-			return sendCommand(d, "toggle", params);
-		} catch (NumberFormatException e) {
-			System.out.println("The second index must be an integer!");
-			return null;
-		} catch (IOException e) {
-			System.out.println("IOException");
-			return null;
 		}
 	}
 
 	/**
-	 * @param d
-	 *            The selected device
-	 * @param parsedInput
-	 *            The parsed input with the first one as the method; Second one
-	 *            as the method; Following are the parameters
-	 * @return The sendCommand result
+	 * A runnable Flash class
+	 * 
+	 * @author Xiangyu Kong
 	 */
-	public String sendBrightCommand(Device d, String[] parsedInput) {
-		try {
-			if (parsedInput.length != 3) {
-				return "format: b <idx> <brightness>";
-			}
-			ArrayList<String> params = new ArrayList<>();
-			for (int i = 2; i < parsedInput.length; i++) {
-				params.add(parsedInput[i]);
-			}
-			return sendCommand(d, "set_bright", params);
-		} catch (NumberFormatException e) {
-			System.out.println("The index must be an int");
-			return null;
-		} catch (IOException e) {
-			System.out.println("IOException");
-			return null;
-		}
-	}
+	private class Flash implements Runnable {
 
-	/**
-	 * @param d
-	 *            The selected device
-	 * @param parsedInput
-	 *            The parsed input with the first one as the method; Second one
-	 *            as the method; Following are the parameters
-	 * @return The sendCommand result
-	 */
-	public String sendColorTemperatureCommand(Device d, String[] parsedInput) {
-		try {
-			if (parsedInput.length != 3) {
-				return "format: ct <idx> <value>";
-			}
-			ArrayList<String> params = new ArrayList<>();
-			params.add(parsedInput[2]);
-			params.add("smooth");
-			params.add("500");
-			return sendCommand(d, "set_ct_abx", params);
-		} catch (NumberFormatException e) {
-			System.out.println("The index must be an int");
-			return null;
-		} catch (IOException e) {
-			System.out.println("IOException");
-			return null;
-		}
-	}
+		private Device d;
+		private int times;
 
-	/**
-	 * @param d
-	 *            The selected device
-	 * @param parsedInput
-	 *            The parsed input with the first one as the method; Second one
-	 *            as the method; Following are the parameters
-	 * @return The sendCommand result
-	 */
-	public String sendRGBCommand(Device d, String[] parsedInput) {
-		try {
-			if (parsedInput.length != 5) {
-				return "format: rgb <idx> <r> <g> <b>";
-			}
-			int r = Integer.valueOf(parsedInput[2]);
-			int g = Integer.valueOf(parsedInput[3]);
-			int b = Integer.valueOf(parsedInput[4]);
-			int rgb = r * 65536 + g * 256 + b;
-			ArrayList<String> params = new ArrayList<>();
-			params.add(String.valueOf(rgb));
-			params.add("smooth");
-			params.add("500");
-			return sendCommand(d, "set_rgb", params);
-		} catch (NumberFormatException e) {
-			System.out.println("The index must be an int");
-			return null;
-		} catch (IOException e) {
-			System.out.println("IOException");
-			return null;
+		Flash(Device d, int times) {
+			this.d = d;
+			this.times = times;
 		}
-	}
 
-	/**
-	 * @param d
-	 *            The selected device
-	 * @param parsedInput
-	 *            The parsed input with the first one as the method; Second one
-	 *            as the method; Following are the parameters
-	 * @return The sendCommand result
-	 */
-	public String sendHSVCommand(Device d, String[] parsedInput) {
-		try {
-			if (parsedInput.length != 4) {
-				return "format: hsv <idx> <hue> <sat>";
+		@Override
+		public void run() {
+			// On and off parameters
+			ArrayList<String> onParams = new ArrayList<String>();
+			onParams.add("on");
+			onParams.add("smooth");
+			onParams.add("200");
+			ArrayList<String> offParams = new ArrayList<String>();
+			offParams.add("off");
+			offParams.add("smooth");
+			offParams.add("200");
+			// turn on and of for times times
+			for (int i = times; i != 0; i--) {
+				try {
+					Thread.sleep(1000);
+					System.out.println(sendNonInterruptCommand(d, "set_power", onParams));
+					Thread.sleep(500);
+					System.out
+							.println(sendNonInterruptCommand(d, "set_power", offParams));
+				} catch (NumberFormatException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} catch (InterruptedException e) {
+					break;
+				}
 			}
-			ArrayList<String> params = new ArrayList<>();
-			params.add(parsedInput[2]);
-			params.add(parsedInput[3]);
-			params.add("smooth");
-			params.add("500");
-			String response = sendCommand(d, "set_hsv", params);
-			return response;
-		} catch (NumberFormatException e) {
-			System.out.println("The index must be an int");
-			return null;
-		} catch (IOException e) {
-			System.out.println("IOException");
-			return null;
 		}
 	}
 

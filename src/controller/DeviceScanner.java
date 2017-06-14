@@ -38,7 +38,7 @@ public class DeviceScanner {
 			executor.shutdownNow();
 		}
 	}
-	
+
 	/**
 	 * @return the Json Array of devices
 	 */
@@ -53,7 +53,7 @@ public class DeviceScanner {
 		System.out.println(arr.toString());
 		return arr;
 	}
-	
+
 	/**
 	 * @return an array list of devices
 	 */
@@ -64,15 +64,15 @@ public class DeviceScanner {
 		}
 		return result;
 	}
-	
+
 	/**
 	 * @return return a string of all devices
 	 */
 	public String listDevices() {
 		String result = "";
 		ArrayList<Device> list = getListDevice();
-		
-		for (int i = 0; i < list.size(); i ++) {
+
+		for (int i = 0; i < list.size(); i++) {
 			result += i + ": ";
 			result += list.get(i) + "\n";
 		}

@@ -10,9 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Scanner implements Runnable {
 
-	private static final String DISCOVERY_MSG = "M-SEARCH * HTTP/1.1\r\n" 
-			+ "HOST:239.255.255.250:1982\r\n"
-			+ "MAN:\"ssdp:discover\"\r\n"
+	private static final String DISCOVERY_MSG = "M-SEARCH * HTTP/1.1\r\n"
+			+ "HOST:239.255.255.250:1982\r\n" + "MAN:\"ssdp:discover\"\r\n"
 			+ "ST:wifi_bulb\r\n";
 	private static final String MULTICAST_ADDR = "239.255.255.250";
 	private static final int MULTICAST_PORT = 1982;
@@ -45,10 +44,8 @@ public class Scanner implements Runnable {
 			byte[] buf = new byte[2048];
 			packet = new DatagramPacket(buf, buf.length);
 			try {
-				socket.send(new DatagramPacket(searchPacket,
-						searchPacket.length,
-						InetAddress.getByName(MULTICAST_ADDR),
-						MULTICAST_PORT));
+				socket.send(new DatagramPacket(searchPacket, searchPacket.length,
+						InetAddress.getByName(MULTICAST_ADDR), MULTICAST_PORT));
 				while (true) {
 					// sleep
 					Thread.sleep(200);
@@ -56,11 +53,13 @@ public class Scanner implements Runnable {
 					String lightData = new String(packet.getData());
 					if (lightData.contains("HTTP/1.1 200 OK")) {
 						// Discovery response
-						Device deviceInfo = DeviceInfoFactory.createFromDeviceResponse(lightData);
+						Device deviceInfo = DeviceInfoFactory
+								.createFromDeviceResponse(lightData);
 						deviceList.put(deviceInfo.getDeviceId(), deviceInfo);
 					} else if (lightData.contains("NOTIFY * HTTP/1.1")) {
 						// Notify message
-						Device deviceInfo = DeviceInfoFactory.createFromDeviceResponse(lightData);
+						Device deviceInfo = DeviceInfoFactory
+								.createFromDeviceResponse(lightData);
 						deviceList.put(deviceInfo.getDeviceId(), deviceInfo);
 					} else {
 						continue;
@@ -74,7 +73,8 @@ public class Scanner implements Runnable {
 
 	public HashMap<String, Device> getFoundDevices() {
 		@SuppressWarnings("unchecked")
-		HashMap<String, Device> foundDevices =  (HashMap<String, Device>) deviceList.clone();
+		HashMap<String, Device> foundDevices = (HashMap<String, Device>) deviceList
+				.clone();
 		deviceList.clear();
 		return foundDevices;
 	}

@@ -1,8 +1,6 @@
 package main;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 import controller.CommandSender;
@@ -13,120 +11,58 @@ public class Main {
 
 	public static int cmdId = 0;
 
-	public static String getClientMessage() {
-		return "Usage:"
-				+ "\n\t q|quit: quit bulb manager"
-				+ "\n\t h|help: print this message"
-				+ "\n\t r|refresh: refresh bulb list"
-				+ "\n\t l|list: list all managed bulbs"
-				+ "\n\t t|toggle <idx>: toggle bulb <idx>"
-				+ "\n\t b|bright <idx> <brightness>: set brightness of bulb <idx>"
-				+ "\n\t\t brightness: 1 ~ 100"
-				+ "\n\t ct|color temperature <idx> <value>: change the color temperature of bulb <idx>"
-				+ "\n\t\t value: 1700 ~ 6500"
-				+ "\n\t rgb| <idx> <r> <g> <b>: change the rgb value of the bulb <idx>"
-				+ "\n\t\t r: 1 ~ 255; g: 1 ~ 255; b: 1 ~ 255"
-				+ "\n\t hsv| <idx> <hue> <sat>: change the hue and the saturation of the bulb <idx>"
-				+ "\n\t\t hue: 0 ~ 359; sat: 0 ~ 100"
-				+ "";
-	}
-	
-	private static Device getDevice(ArrayList<Device> dl, String[] parsedInput) {
-		if (parsedInput.length < 2) {
-			System.out.println("Format error. Hit h for help");
-			return null;
-		}
-		int index;
-		try {
-			index = Integer.valueOf(parsedInput[1]);
-			if (index > dl.size() || index < 0) {
-				System.out.println("Invalid index");
-				return null;
-			} else {
-				return dl.get(Integer.valueOf(parsedInput[1]));
-			}
-		} catch (NumberFormatException e) {
-			System.out.println("Index must be an integer.");
-			return null;
-		}
-	}
-	
 	public static void main(String[] args) {
 		DeviceScanner ds = new DeviceScanner();
 		CommandSender cs = new CommandSender();
-		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-		String input = "";
-		Device d;
-		
-		System.out.println(getClientMessage());
-		System.out.print(">>> ");
-		
+
+		// Scan devices
 		try {
 			ds.scanDevices();
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
-		
-		while (true) {
-			
+
+		while (ds.getListDevice().size() == 0) {
 			try {
-				input = br.readLine();
-			} catch (IOException e) {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
-			
-			String[] parsedInput = input.split(" ");			
-			String cmd = parsedInput[0];
-			if (cmd.equalsIgnoreCase("q") || cmd.equalsIgnoreCase("quit")) {
-				System.out.println("Thanks for using! Quitting ...");
-				break;
-			} else if (cmd.equalsIgnoreCase("h") || cmd.equalsIgnoreCase("help")) {
-				System.out.println(getClientMessage());
-			} else if (cmd.equalsIgnoreCase("r") || cmd.equalsIgnoreCase("refresh")) {
-				System.out.println("Refreshing ...");
-				ds.listDevices();
-				try {
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-				}	
-			} else if (cmd.equalsIgnoreCase("l") || cmd.equalsIgnoreCase("list")) {
-				System.out.println("Result: ");
-				System.out.println(ds.listDevices());
-			} else if (cmd.equalsIgnoreCase("t") || cmd.equalsIgnoreCase("toggle")) {
-				// toggle
-				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
-					System.out.println(cs.sendToggleCommand(d, parsedInput));
-				}
-			} else if (cmd.equalsIgnoreCase("b") || cmd.equalsIgnoreCase("bright")) {
-				// bright
-				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
-					System.out.println(cs.sendBrightCommand(d, parsedInput));
-				}
-			} else if (cmd.equalsIgnoreCase("ct") || cmd.equalsIgnoreCase("color temperature")) {
-				// change color temperature
-				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
-					System.out.println(cs.sendColorTemperatureCommand(d, parsedInput));
-				}
-			} else if (cmd.equalsIgnoreCase("rgb")) {
-				// change color
-				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
-					System.out.println(cs.sendRGBCommand(d, parsedInput));
-				}
-			} else if (cmd.equalsIgnoreCase("hsv")) {
-				// change hsv
-				if ((d = getDevice(ds.getListDevice(), parsedInput)) != null) {
-					System.out.println(cs.sendHSVCommand(d, parsedInput));
-				}
-			} else if (cmd.equalsIgnoreCase("")) {
-				
-			} else {
-				System.out.println("Invalid Command.");
-				System.out.println(getClientMessage());
-			}
-			
-			System.out.print(">>> ");
 		}
-		
+		ds.getArrayDevice();
+		Device d = ds.getListDevice().get(0);
+
+		ArrayList<String> onParams = new ArrayList<String>();
+		onParams.add("on");
+		onParams.add("smooth");
+		onParams.add("200");
+		ArrayList<String> offParams = new ArrayList<String>();
+		offParams.add("off");
+		offParams.add("smooth");
+		offParams.add("200");
+		ArrayList<String> ctParams = new ArrayList<String>();
+		ctParams.add("6000");
+		ctParams.add("smooth");
+		ctParams.add("200");
+		ArrayList<String> rgbParams = new ArrayList<String>();
+		rgbParams.add(String.valueOf(255 * 256 * 256 + 255 * 256 + 255));
+		rgbParams.add("smooth");
+		rgbParams.add("200");
+		ArrayList<String> brightParams = new ArrayList<String>();
+		brightParams.add("100");
+		brightParams.add("smooth");
+		brightParams.add("200");
+
+		try {
+			System.out.println(cs.sendCommand(d, "set_rgb", rgbParams));
+		} catch (NumberFormatException e2) {
+			e2.printStackTrace();
+		} catch (IOException e2) {
+			e2.printStackTrace();
+//		} catch (InterruptedException e) {
+//			e.printStackTrace();
+		}
+
 		try {
 			ds.stopScanning();
 		} catch (InterruptedException e) {

@@ -30,6 +30,7 @@ public class CommandSender {
 
 	private static int cmdId = 0;
 
+
 	/**
 	 * Helper method to build request method.
 	 * 
@@ -59,6 +60,7 @@ public class CommandSender {
 
 		return message;
 	}
+
 
 	/**
 	 * Helper function that sends a command to the device
@@ -118,10 +120,12 @@ public class CommandSender {
 			socket.setReuseAddress(true);
 			socket.setSoTimeout(SOCKET_TIMEOUT);
 
-//			System.out.println(
-//					"Connecting to " + socket.getInetAddress() + ":" + socket.getPort());
-//			System.out.println("Device ID: " + d.getDeviceId() + ", method: " + method);
-//			System.out.print(message);
+			// System.out.println(
+			// "Connecting to " + socket.getInetAddress() + ":" +
+			// socket.getPort());
+			// System.out.println("Device ID: " + d.getDeviceId() + ", method: "
+			// + method);
+			// System.out.print(message);
 
 			// write from socket to send command
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
@@ -141,13 +145,15 @@ public class CommandSender {
 
 			if (jsonObj.has("result")) {
 				result += jsonObj.get("result").getAsJsonArray().get(0).getAsString();
-//				System.out.println(result);
+				// System.out.println(result);
 				return result;
-			} else {
+			} else if (jsonObj.has("error")) {
 				result += jsonObj.get("error").getAsJsonObject().get("message")
 						.getAsString();
-//				System.out.println(result);
+				// System.out.println(result);
 				return result;
+			} else {
+				return null;
 			}
 
 		} catch (SocketTimeoutException e) {
@@ -156,6 +162,7 @@ public class CommandSender {
 			return null;
 		}
 	}
+
 
 	/**
 	 * Send a command to the selected device and interrupt the flashing thread
@@ -173,12 +180,11 @@ public class CommandSender {
 	 */
 	public String sendCommand(Device d, String method, ArrayList<String> params)
 			throws IOException, NumberFormatException {
-		try {
-			stopFlash();
-		} catch (InterruptedException e1) {
-		}
+
+		stopFlash();
 		return sendNonInterruptCommand(d, method, params);
 	}
+
 
 	/**
 	 * Get the property of a device d.
@@ -203,6 +209,7 @@ public class CommandSender {
 		}
 	}
 
+
 	/**
 	 * Create another thread and starts flashing for times times.
 	 * 
@@ -211,19 +218,19 @@ public class CommandSender {
 	 * @param times
 	 *            Times to flash flash infinitely if set to -1
 	 */
-	public void flash(Device d, int times) {
+	public void flash(Device d) {
 		executor = Executors.newSingleThreadExecutor();
-		Flash f = new Flash(d, times);
+		Flash f = new Flash(d);
 		executor.execute(f);
 		executor.shutdown();
 	}
 
+
 	/**
 	 * Stop flashing and kill the thread
 	 * 
-	 * @throws InterruptedException
 	 */
-	public void stopFlash() throws InterruptedException {
+	public void stopFlash() {
 		if (executor != null) {
 			try {
 				executor.awaitTermination(2000, TimeUnit.MILLISECONDS);
@@ -232,7 +239,11 @@ public class CommandSender {
 			}
 			executor.shutdownNow();
 			while (!executor.isTerminated()) {
-				Thread.sleep(1000);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 				executor.shutdownNow();
 			}
 		}
@@ -245,33 +256,90 @@ public class CommandSender {
 	 */
 	private class Flash implements Runnable {
 
-		private Device d;
-		private int times;
+		static final int WHITE = (0 << 16) | (0 << 8) | 0;
+		static final int RED = (255 << 16) | (0 << 8) | 0;
+		static final int GREEN = (0 << 16) | (255 << 8) | 0;
+		static final int BLUE = (0 << 16) | (0 << 8) | 255;
+		static final int PURPLE = (160 << 16) | (32 << 8) | 240;
+		static final int PINK = (255 << 16) | (181 << 8) | 197;
+		static final int YELLOW = (255 << 16) | (255 << 8) | 0;
+		static final int ORANGE = (255 << 16) | (165 << 8) | 0;
+		static final int SKYBLUE = (135 << 16) | (206 << 8) | 255;
 
-		Flash(Device d, int times) {
+		private Device d;
+		private int color;
+
+
+		Flash(Device d) {
 			this.d = d;
-			this.times = times;
+			this.color = WHITE;
 		}
+
+
+		private int changeRGB() {
+			switch (color) {
+				case WHITE:
+					color = RED;
+					break;
+				case RED:
+					color = ORANGE;
+					break;
+				case ORANGE:
+					color = YELLOW;
+					break;
+				case YELLOW:
+					color = GREEN;
+					break;
+				case GREEN:
+					color = SKYBLUE;
+					break;
+				case SKYBLUE:
+					color = BLUE;
+					break;
+				case BLUE:
+					color = PURPLE;
+					break;
+				case PURPLE:
+					color = PINK;
+					break;
+				case PINK:
+					color = RED;
+					break;
+				default:
+					color = WHITE;
+					break;
+			}
+			return color;
+		}
+
 
 		@Override
 		public void run() {
 			// On and off parameters
-			ArrayList<String> onParams = new ArrayList<String>();
-			onParams.add("on");
-			onParams.add("smooth");
-			onParams.add("200");
-			ArrayList<String> offParams = new ArrayList<String>();
-			offParams.add("off");
-			offParams.add("smooth");
-			offParams.add("200");
+			ArrayList<String> brightHighParams = new ArrayList<String>();
+			brightHighParams.add("100");
+			brightHighParams.add("smooth");
+			brightHighParams.add("500");
+			ArrayList<String> brightLowParams = new ArrayList<String>();
+			brightLowParams.add("1");
+			brightLowParams.add("smooth");
+			brightLowParams.add("500");
+			ArrayList<String> rgbParams = new ArrayList<String>();
+			rgbParams.add(String.valueOf(""));
+			rgbParams.add("smooth");
+			rgbParams.add("25000");
 			// turn on and of for times times
-			for (int i = times; i != 0; i--) {
+			while (true) {
 				try {
+					Thread.sleep(1500);
+					changeRGB();
+					rgbParams.set(0, String.valueOf(color));
+					System.out.println(sendNonInterruptCommand(d, "set_rgb", rgbParams));
+					System.out.println(
+							sendNonInterruptCommand(d, "set_bright", brightHighParams));
 					Thread.sleep(1000);
-					System.out.println(sendNonInterruptCommand(d, "set_power", onParams));
-					Thread.sleep(500);
-					System.out
-							.println(sendNonInterruptCommand(d, "set_power", offParams));
+					System.out.println(
+							sendNonInterruptCommand(d, "set_bright", brightLowParams));
 				} catch (NumberFormatException e) {
 					e.printStackTrace();
 				} catch (IOException e) {

@@ -111,7 +111,7 @@ public class CommandSender {
 	private String sendNonInterruptCommand(Device d, String method,
 			ArrayList<String> params) throws UnknownHostException, IOException {
 		String message = getMsg(method, params);
-		String result = method + ": ";
+		String result = d.getDeviceId() + method + ": ";
 
 		try {
 			Socket socket = new Socket(InetAddress.getByName(d.getDeviceIp()),
@@ -211,16 +211,14 @@ public class CommandSender {
 
 
 	/**
-	 * Create another thread and starts flashing for times times.
+	 * Create another thread and starts flashing all devices.
 	 * 
-	 * @param d
-	 *            The device
-	 * @param times
-	 *            Times to flash flash infinitely if set to -1
+	 * @param dl
+	 *            The device list
 	 */
-	public void flash(Device d) {
+	public void flash(ArrayList<Device> dl) {
 		executor = Executors.newSingleThreadExecutor();
-		Flash f = new Flash(d);
+		Flash f = new Flash(dl);
 		executor.execute(f);
 		executor.shutdown();
 	}
@@ -228,7 +226,6 @@ public class CommandSender {
 
 	/**
 	 * Stop flashing and kill the thread
-	 * 
 	 */
 	public void stopFlash() {
 		if (executor != null) {
@@ -242,9 +239,9 @@ public class CommandSender {
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+				} finally {
+					executor.shutdownNow();
 				}
-				executor.shutdownNow();
 			}
 		}
 	}
@@ -266,16 +263,20 @@ public class CommandSender {
 		static final int ORANGE = (255 << 16) | (165 << 8) | 0;
 		static final int SKYBLUE = (135 << 16) | (206 << 8) | 255;
 
-		private Device d;
+		private ArrayList<Device> dl;
 		private int color;
 
 
-		Flash(Device d) {
-			this.d = d;
+		Flash(ArrayList<Device> dl) {
+			this.dl = dl;
 			this.color = WHITE;
 		}
 
 
+		/**
+		 * change the RGB value according to previous RGB value
+		 * @return the new RGB value
+		 */
 		private int changeRGB() {
 			switch (color) {
 				case WHITE:
@@ -315,7 +316,7 @@ public class CommandSender {
 
 		@Override
 		public void run() {
-			// On and off parameters
+			// bright high and low parameters
 			ArrayList<String> brightHighParams = new ArrayList<String>();
 			brightHighParams.add("100");
 			brightHighParams.add("smooth");
@@ -328,20 +329,38 @@ public class CommandSender {
 			rgbParams.add(String.valueOf(""));
 			rgbParams.add("smooth");
 			rgbParams.add("25000");
-			// turn on and of for times times
+			// check if devices are off and remove off devices
+			for (Device d : dl) {
+				ArrayList<String> prop = new ArrayList<>();
+				prop.add("power");
+				try {
+					if (sendNonInterruptCommand(d, "get_prop", prop)
+							.equalsIgnoreCase("off")) {
+						dl.remove(d);
+					}
+				} catch (UnknownHostException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			// keep flashing until interrupted
 			while (true) {
 				try {
 					Thread.sleep(1500);
 					changeRGB();
 					rgbParams.set(0, String.valueOf(color));
-					System.out.println(sendNonInterruptCommand(d, "set_rgb", rgbParams));
-					System.out.println(
-							sendNonInterruptCommand(d, "set_bright", brightHighParams));
+					for (Device d : dl) {
+						System.out.println(
+								sendNonInterruptCommand(d, "set_rgb", rgbParams));
+						System.out.println(sendNonInterruptCommand(d, "set_bright",
+								brightHighParams));
+					}
 					Thread.sleep(1000);
-					System.out.println(
-							sendNonInterruptCommand(d, "set_bright", brightLowParams));
-				} catch (NumberFormatException e) {
-					e.printStackTrace();
+					for (Device d : dl) {
+						System.out.println(sendNonInterruptCommand(d, "set_bright",
+								brightLowParams));
+					}
 				} catch (IOException e) {
 					e.printStackTrace();
 				} catch (InterruptedException e) {

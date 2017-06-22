@@ -62,7 +62,7 @@ public class Screwin {
 
 			Thread.sleep(1000);
 
-			cs.flash(d, -1);
+			cs.flash(ds.getListDevice());
 
 			Thread.sleep(3000);
 

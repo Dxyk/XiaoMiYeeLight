@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +112,7 @@ public class CommandSender {
 	private String sendNonInterruptCommand(Device d, String method,
 			ArrayList<String> params) throws UnknownHostException, IOException {
 		String message = getMsg(method, params);
-		String result = d.getDeviceId() + method + ": ";
+		String result = d.getDeviceId() + ": " + method + ": ";
 
 		try {
 			Socket socket = new Socket(InetAddress.getByName(d.getDeviceIp()),
@@ -120,6 +121,7 @@ public class CommandSender {
 			socket.setReuseAddress(true);
 			socket.setSoTimeout(SOCKET_TIMEOUT);
 
+			// Testing
 			// System.out.println(
 			// "Connecting to " + socket.getInetAddress() + ":" +
 			// socket.getPort());
@@ -199,7 +201,7 @@ public class CommandSender {
 		ArrayList<String> prop = new ArrayList<String>();
 		prop.add(property);
 		try {
-			return sendCommand(d, "get_prop", prop);
+			return sendNonInterruptCommand(d, "get_prop", prop);
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
 			return null;
@@ -258,13 +260,21 @@ public class CommandSender {
 		static final int GREEN = (0 << 16) | (255 << 8) | 0;
 		static final int BLUE = (0 << 16) | (0 << 8) | 255;
 		static final int PURPLE = (160 << 16) | (32 << 8) | 240;
-		static final int PINK = (255 << 16) | (181 << 8) | 197;
 		static final int YELLOW = (255 << 16) | (255 << 8) | 0;
 		static final int ORANGE = (255 << 16) | (165 << 8) | 0;
 		static final int SKYBLUE = (135 << 16) | (206 << 8) | 255;
 
+		static final int HIGH_BRIGHT = 60;
+		static final int MEDIUM_TO_HIGH_BRIGHT = 41;
+		static final int MEDIUM_TO_LOW_BRIGHT = 39;
+		static final int LOW_BRIGHT = 20;
+
+		// Controls the interval of change of color and brightness
+		private final int interval = 4000;
+
 		private ArrayList<Device> dl;
 		private int color;
+		private int bright;
 
 
 		Flash(ArrayList<Device> dl) {
@@ -274,7 +284,39 @@ public class CommandSender {
 
 
 		/**
+		 * change the brightness value according to previous brightness value
+		 * 
+		 * @return the new bright value
+		 */
+		private int changeBright() {
+			switch (bright) {
+				case HIGH_BRIGHT: {
+					bright = MEDIUM_TO_LOW_BRIGHT;
+					break;
+				}
+				case MEDIUM_TO_LOW_BRIGHT: {
+					bright = LOW_BRIGHT;
+					break;
+				}
+				case LOW_BRIGHT: {
+					bright = MEDIUM_TO_HIGH_BRIGHT;
+					break;
+				}
+				case MEDIUM_TO_HIGH_BRIGHT: {
+					bright = HIGH_BRIGHT;
+					break;
+				}
+				default: {
+					bright = LOW_BRIGHT;
+				}
+			}
+			return bright;
+		}
+
+
+		/**
 		 * change the RGB value according to previous RGB value
+		 * 
 		 * @return the new RGB value
 		 */
 		private int changeRGB() {
@@ -301,9 +343,6 @@ public class CommandSender {
 					color = PURPLE;
 					break;
 				case PURPLE:
-					color = PINK;
-					break;
-				case PINK:
 					color = RED;
 					break;
 				default:
@@ -314,60 +353,116 @@ public class CommandSender {
 		}
 
 
+		/**
+		 * Send a command to a specific device with its corresponding socket.
+		 * 
+		 * @param d
+		 *            The device
+		 * @param socket
+		 *            The corresponding socket
+		 * @param method
+		 *            The method name
+		 * @param message
+		 *            the message to be sent
+		 * @return the response
+		 * @throws IOException
+		 */
+		private String send(Device d, Socket socket, String method, String message)
+				throws IOException {
+			String result = d.getDeviceId() + ": " + method + ": ";
+			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+			out.write(message.getBytes());
+			out.flush();
+
+			// recieve from light for response
+			BufferedReader in = new BufferedReader(
+					new InputStreamReader(socket.getInputStream()));
+			String lightData = "";
+			lightData = in.readLine();
+			JsonParser jp = new JsonParser();
+			JsonObject jsonObj = jp.parse(lightData).getAsJsonObject();
+
+			if (jsonObj.has("result")) {
+				result += jsonObj.get("result").getAsJsonArray().get(0).getAsString();
+				// System.out.println(result);
+				return result;
+			} else if (jsonObj.has("error")) {
+				result += jsonObj.get("error").getAsJsonObject().get("message")
+						.getAsString();
+				// System.out.println(result);
+				return result;
+			} else {
+				return jsonObj.toString();
+			}
+		}
+
+
 		@Override
 		public void run() {
-			// bright high and low parameters
-			ArrayList<String> brightHighParams = new ArrayList<String>();
-			brightHighParams.add("100");
-			brightHighParams.add("smooth");
-			brightHighParams.add("500");
-			ArrayList<String> brightLowParams = new ArrayList<String>();
-			brightLowParams.add("1");
-			brightLowParams.add("smooth");
-			brightLowParams.add("500");
+			ArrayList<String> brightParams = new ArrayList<String>();
+			brightParams.add("20");
+			brightParams.add("smooth");
+			brightParams.add(String.valueOf(interval));
 			ArrayList<String> rgbParams = new ArrayList<String>();
 			rgbParams.add(String.valueOf(""));
 			rgbParams.add("smooth");
-			rgbParams.add("25000");
+			rgbParams.add(String.valueOf(interval));
 			// check if devices are off and remove off devices
 			for (Device d : dl) {
-				ArrayList<String> prop = new ArrayList<>();
-				prop.add("power");
+				if (getProperty(d, "power").equals("off")) {
+					dl.remove(d);
+				}
+			}
+			// create a hashmap and store all sockets corresponding to the
+			// devices
+			HashMap<Device, Socket> map = new HashMap<>();
+			for (Device d : dl) {
+				Socket socket;
 				try {
-					if (sendNonInterruptCommand(d, "get_prop", prop)
-							.equalsIgnoreCase("off")) {
-						dl.remove(d);
-					}
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
+					socket = new Socket(InetAddress.getByName(d.getDeviceIp()),
+							d.getServicePort());
+					socket.setKeepAlive(true);
+					socket.setReuseAddress(true);
+					socket.setSoTimeout(SOCKET_TIMEOUT);
+					map.put(d, socket);
 				} catch (IOException e) {
+					map.remove(d);
 					e.printStackTrace();
 				}
 			}
-			// keep flashing until interrupted
+			//
 			while (true) {
+				changeRGB();
+				changeBright();
+				rgbParams.set(0, String.valueOf(color));
+				brightParams.set(0, String.valueOf(bright));
+				String rgbMessage = getMsg("set_rgb", rgbParams);
+				String brightMessage = getMsg("set_bright", brightParams);
 				try {
-					Thread.sleep(1500);
-					changeRGB();
-					rgbParams.set(0, String.valueOf(color));
-					for (Device d : dl) {
-						System.out.println(
-								sendNonInterruptCommand(d, "set_rgb", rgbParams));
-						System.out.println(sendNonInterruptCommand(d, "set_bright",
-								brightHighParams));
+					for (Device d : map.keySet()) {
+						Socket socket = map.get(d);
+						send(d, socket, "set_bright", brightMessage);
+						send(d, socket, "set_rgb", rgbMessage);
+						// for testing purposes
+//						System.out.println(send(d, socket, "set_bright", brightMessage));
+//						System.out.println(send(d, socket, "set_rgb", rgbMessage));
 					}
-					Thread.sleep(1000);
-					for (Device d : dl) {
-						System.out.println(sendNonInterruptCommand(d, "set_bright",
-								brightLowParams));
-					}
+					Thread.sleep(interval);
 				} catch (IOException e) {
-					e.printStackTrace();
+//					e.printStackTrace();
 				} catch (InterruptedException e) {
+					for (Socket socket : map.values()) {
+						try {
+							socket.close();
+						} catch (IOException e1) {
+							e1.printStackTrace();
+						}
+					}
 					break;
 				}
 			}
 		}
+
 	}
 
 }
